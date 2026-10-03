@@ -32,7 +32,11 @@ CFG = dict(
     fee_bps=10, slip_bps=5,
 )
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+# ------------------------------ PAPER TRADING --------------------------
+PAPER_START = "2026-10-05"        # bougie (UTC) dont la clôture sert de prix d'entrée (un lundi)
+PAPER_DAYS = 56                   # 8 semaines
+
+HERE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
 OUT_FILE = os.path.join(HERE, "docs", "data.js")
 
 
@@ -169,6 +173,49 @@ def rl(x, nd=4):
     return [None if not np.isfinite(v) else round(float(v), nd) for v in x]
 
 
+def paper_block(out, W, n, bh):
+    """Paper trading : portefeuille démarré en cash, qui achète les poids décidés à la clôture de PAPER_START."""
+    start = pd.Timestamp(PAPER_START)
+    end = start + pd.Timedelta(days=PAPER_DAYS)
+    info = dict(start=str(start.date()), end=str(end.date()), days_total=PAPER_DAYS)
+    last = W.index[-1]
+    if last < start:
+        info["status"] = "pending"
+        return info
+    c = (CFG["fee_bps"] + CFG["slip_bps"]) / 1e4
+    nets = []
+    for s, v in out.items():
+        net, w = v[0].copy(), v[3]
+        idx = net.index[(net.index > start) & (net.index <= end)]
+        if len(idx):   # 1er jour : coût d'entrée depuis 0 (et non depuis le poids du backtest)
+            net.loc[idx[0]] += (abs(float(w.loc[start]) - float(w.shift().loc[start])) - float(w.loc[start])) * c
+        nets.append(net.loc[idx])
+    r_p = pd.concat(nets, axis=1).mean(axis=1)
+    b = bh.loc[(bh.index > start) & (bh.index <= end)]
+    eq = pd.concat([pd.Series([100.0], index=[start]), (1 + r_p).cumprod() * 100])
+    bq = pd.concat([pd.Series([100.0], index=[start]), (1 + b).cumprod() * 100])
+    dd, bdd = eq / eq.cummax() - 1, bq / bq.cummax() - 1
+    rows, cum = [], 1.0
+    for t, x in r_p.items():
+        cum *= 1 + x
+        rows.append(dict(date=str(t.date()), **{s: float(W.loc[t, s]) for s in out},
+                         cash=float(W.loc[t, "cash"]), ret=float(x), cum=cum - 1))
+    moves = 0
+    for s, v in out.items():
+        dw = v[3].diff().fillna(0.0)
+        moves += int((dw[(dw.index > start) & (dw.index <= end)].abs() > 1e-9).sum())
+    info.update(
+        status="done" if last >= end else "running",
+        days=int(len(r_p)),
+        strat_ret=float(eq.iloc[-1] / 100 - 1), bh_ret=float(bq.iloc[-1] / 100 - 1),
+        mdd=float(dd.min()), bh_mdd=float(bdd.min()), moves=moves,
+        avg_exposure=float(1 - W.loc[r_p.index, "cash"].mean()) if len(r_p) else None,
+        entry={s: float(W.loc[start, s]) for s in out},
+        dates=[str(t.date()) for t in eq.index], strat=rl(eq, 2), bh=rl(bq, 2),
+        rows=rows[-60:])
+    return info
+
+
 def build_payload(data, cash_d):
     n = len(data)
     out = run_all(data, cash_d)
@@ -245,6 +292,7 @@ def build_payload(data, cash_d):
                      **{s: rl(wh[s], 4) for s in data}, cash=rl(wh["cash"], 4)),
         monthly=monthly,
         trades=trades[:40],
+        paper=paper_block(out, W, n, bh),
     )
     return clean(payload), actions
 
