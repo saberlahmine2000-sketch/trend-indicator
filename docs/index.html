@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trend Indicator — BTC · ETH</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<style>
+:root{
+  --bg:#0a0e16; --panel:#111827; --panel2:#0d1320; --line:#1e293b; --txt:#e5e7eb; --mut:#8b97ab;
+  --acc:#2dd4bf; --pos:#22c55e; --neg:#ef4444; --warn:#f59e0b; --btc:#f7931a; --eth:#8c9eff;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(1100px 520px at 85% -8%,rgba(45,212,191,.10),transparent),var(--bg);
+  color:var(--txt);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+.wrap{max-width:1280px;margin:0 auto;padding:20px 22px 48px}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .mut{color:var(--mut)}
+
+/* En-tête */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--acc),#3b82f6);
+  display:grid;place-items:center;font-size:20px;box-shadow:0 6px 24px rgba(45,212,191,.25)}
+.brand h1{margin:0;font-size:18px;letter-spacing:.2px}
+.brand small{color:var(--mut)}
+.meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--mut);font-size:12.5px}
+.pill{padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-size:12px}
+.pill.ok{color:var(--pos);border-color:rgba(34,197,94,.35)}
+.pill.warn{color:var(--warn);border-color:rgba(245,158,11,.4)}
+
+/* Bandeau d'action */
+.banner{border-radius:14px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;
+  border:1px solid var(--line);background:var(--panel)}
+.banner.act{border-color:rgba(245,158,11,.5);background:linear-gradient(90deg,rgba(245,158,11,.14),var(--panel))}
+.banner.calm{border-color:rgba(34,197,94,.35);background:linear-gradient(90deg,rgba(34,197,94,.10),var(--panel))}
+.banner.stale{border-color:rgba(239,68,68,.5);background:linear-gradient(90deg,rgba(239,68,68,.14),var(--panel))}
+.banner b{font-size:15px}
+.banner .ic{font-size:22px}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi span{display:block;color:var(--mut);font-size:12px;margin-bottom:4px}
+.kpi b{font-size:22px;font-weight:650}
+
+/* Cartes */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card h2{margin:0 0 12px;font-size:14px;color:var(--mut);font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+.row{display:grid;gap:16px;margin-bottom:16px}
+.r2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+.r3{grid-template-columns:2fr 1fr}
+@media (max-width:900px){.r3{grid-template-columns:1fr}.r2{grid-template-columns:1fr}}
+
+/* Signaux */
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 10px}
+.sec-head h2{margin:0;font-size:14px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+.cap{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:12.5px}
+input[type=number]{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;
+  padding:6px 8px;width:110px;font:inherit}
+input[type=number]:focus{outline:1px solid var(--acc)}
+.sig{position:relative;overflow:hidden}
+.sig::before{content:"";position:absolute;inset:0 auto 0 0;width:4px}
+.sig.on::before{background:var(--pos)} .sig.off::before{background:var(--neg)}
+.sig-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sym{display:flex;align-items:center;gap:10px;font-weight:650;font-size:16px}
+.dot{width:10px;height:10px;border-radius:50%}
+.badge{padding:5px 12px;border-radius:999px;font-weight:700;font-size:12px;letter-spacing:.5px}
+.badge.bull{background:rgba(34,197,94,.15);color:var(--pos);border:1px solid rgba(34,197,94,.4)}
+.badge.bear{background:rgba(239,68,68,.15);color:var(--neg);border:1px solid rgba(239,68,68,.4)}
+.price{font-size:30px;font-weight:700;margin:2px 0}
+.sub{color:var(--mut);font-size:12.5px;margin-bottom:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.grid3 div{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.grid3 span{display:block;color:var(--mut);font-size:11.5px}
+.grid3 b{font-size:16px}
+.grid3 input{width:100%;padding:3px 6px}
+.order{border-radius:10px;padding:10px 12px;font-weight:650;border:1px solid var(--line);background:var(--panel2)}
+.order.ACHETER{color:var(--pos);border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.08)}
+.order.VENDRE{color:var(--neg);border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.08)}
+.order small{display:block;color:var(--mut);font-weight:400;margin-top:2px}
+
+/* Graphiques */
+.chart{position:relative;height:300px}
+.chart.sm{height:220px}
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.btn{background:var(--panel2);color:var(--mut);border:1px solid var(--line);border-radius:8px;padding:5px 11px;
+  cursor:pointer;font:inherit;font-size:12.5px}
+.btn:hover{color:var(--txt)}
+.btn.on{color:#04211d;background:var(--acc);border-color:var(--acc);font-weight:650}
+
+/* Tableaux */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600;font-size:12px}
+tr:last-child td{border-bottom:0}
+.heat td{padding:6px 4px;text-align:center;font-size:12px;border:2px solid var(--panel)}
+.heat td:first-child{text-align:left;color:var(--mut);padding-left:8px}
+.heat th{text-align:center}
+.scroll{overflow-x:auto}
+.foot{color:var(--mut);font-size:12px;margin-top:22px;line-height:1.6}
+.err{padding:30px;color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="logo">📈</div>
+      <div><h1>Trend Indicator</h1><small id="subtitle">BTC · ETH</small></div>
+    </div>
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <div id="banner"></div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="sec-head">
+    <h2>Signaux &amp; ordres</h2>
+    <div class="cap">Capital (USD)
+      <input type="number" id="capital" min="0" step="100">
+    </div>
+  </div>
+  <div class="row r2" id="signals"></div>
+
+  <div class="row r3">
+    <div class="card">
+      <h2>Courbe de capital — stratégie vs Buy &amp; Hold (base 100)</h2>
+      <div class="tools">
+        <button class="btn" data-range="1y">1 an</button>
+        <button class="btn" data-range="3y">3 ans</button>
+        <button class="btn on" data-range="all">Tout</button>
+        <span style="flex:1"></span>
+        <button class="btn on" id="logBtn">Échelle log</button>
+      </div>
+      <div class="chart"><canvas id="eqChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Performance</h2>
+      <div class="scroll"><table id="perf"></table></div>
+    </div>
+  </div>
+
+  <div class="row r2">
+    <div class="card"><h2>Drawdown</h2><div class="chart sm"><canvas id="ddChart"></canvas></div></div>
+    <div class="card"><h2>Allocation — 180 derniers jours (% du capital)</h2><div class="chart sm"><canvas id="wChart"></canvas></div></div>
+  </div>
+
+  <div class="row r2">
+    <div class="card">
+      <h2>Prix vs MA200 — 12 mois</h2>
+      <div class="tools" id="priceTabs"></div>
+      <div class="chart sm"><canvas id="pChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Indicateurs de risque / rendement</h2>
+      <div class="scroll"><table id="metrics"></table></div>
+    </div>
+  </div>
+
+  <div class="row r2">
+    <div class="card" style="grid-column:1/-1">
+      <h2>Rendements mensuels de la stratégie</h2>
+      <div class="scroll"><table class="heat" id="monthly"></table></div>
+    </div>
+  </div>
+
+  <div class="row r2">
+    <div class="card" style="grid-column:1/-1">
+      <h2>Derniers mouvements de poids (part du capital)</h2>
+      <div class="scroll"><table id="trades"></table></div>
+    </div>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script src="data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+const D = window.DATA;
+if(!D){ document.body.innerHTML='<p class="err">data.js introuvable : lance <code>python indicator.py</code> ou le workflow GitHub.</p>'; return; }
+
+const $ = s => document.querySelector(s);
+const pct = (x,d=1,sign=true) => x==null ? '—' : ((sign&&x>0?'+':'') + (x*100).toFixed(d).replace('.',',') + ' %');
+const num = (x,d=2) => x==null ? '—' : x.toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const usd = x => '$' + x.toLocaleString('fr-FR',{maximumFractionDigits:0});
+const cls = x => x>0 ? 'pos' : (x<0 ? 'neg' : '');
+const store = {
+  get(k,def){ try{ const v=localStorage.getItem(k); return v===null?def:JSON.parse(v); }catch(e){ return def; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+const COLORS = {'BTC-USD':'#f7931a','ETH-USD':'#8c9eff'};
+const n = D.config.n, band = D.config.rebal_band;
+let capital = store.get('capital', 10000);
+
+/* ---------- En-tête ---------- */
+$('#subtitle').textContent = D.config.assets.join(' · ') + ' — tendance MA' + D.config.ma + ' + vol-target ' + Math.round(D.config.target_vol*100) + ' %';
+$('#meta').innerHTML =
+  '<span class="pill '+(D.stale?'warn':'ok')+'">'+(D.stale?'Données anciennes':'Données à jour')+'</span>' +
+  '<span>Bougie du <b class="num">'+D.last_bar+'</b></span><span>·</span><span>Calculé le '+D.generated_utc+'</span>';
+
+/* ---------- Ordres ---------- */
+function orderFor(a){
+  const heldPct = store.get('held_'+a.sym, null);
+  const held = heldPct==null ? a.prev_w : heldPct/100;
+  const d = a.target - held;
+  const act = (Math.abs(d*n) > band || (a.target===0 && held>0)) ? (d>0?'ACHETER':'VENDRE') : 'GARDER';
+  return {held, heldPct, d, act};
+}
+
+function renderBanner(){
+  const acts = D.assets.map(a=>({a,o:orderFor(a)})).filter(x=>x.o.act!=='GARDER');
+  let h;
+  if(D.stale) h = '<div class="banner stale"><span class="ic">⚠️</span><div><b>Données anciennes</b><div class="mut">Vérifie le workflow GitHub (onglet Actions) : la dernière bougie date du '+D.last_bar+'.</div></div></div>';
+  else if(acts.length) h = '<div class="banner act"><span class="ic">⚡</span><div><b>Action requise</b><div class="mut">'+
+    acts.map(x=>x.o.act+' '+x.a.name+' '+pct(Math.abs(x.o.d),1,false)+' du capital').join(' · ')+'</div></div></div>';
+  else h = '<div class="banner calm"><span class="ic">✓</span><div><b>Aucune action aujourd\'hui</b><div class="mut">Garde tes positions : les poids cibles sont inchangés.</div></div></div>';
+  $('#banner').innerHTML = h;
+}
+
+function renderKPIs(){
+  const p = Object.fromEntries(D.periods.map(x=>[x[0],x]));
+  const E = D.equity.strat; let m=-1e18, dd=0; E.forEach(v=>{ if(v>m) m=v; dd=v/m-1; });
+  const items = [
+    ['Exposition crypto', pct(D.exposure,0,false), ''],
+    ['Cash / T-bills', pct(D.cash_w,0,false), ''],
+    ['Dernier jour', pct(p['Dernier jour'][1],2), cls(p['Dernier jour'][1])],
+    ['30 jours', pct(p['30 jours'][1],1), cls(p['30 jours'][1])],
+    ['Depuis le 1er janvier', pct(p['Depuis le 1er janvier'][1],1), cls(p['Depuis le 1er janvier'][1])],
+    ['Drawdown actuel', pct(dd,1), cls(dd)],
+  ];
+  $('#kpis').innerHTML = items.map(i=>'<div class="kpi"><span>'+i[0]+'</span><b class="num '+i[2]+'">'+i[1]+'</b></div>').join('');
+}
+
+function renderSignals(){
+  $('#signals').innerHTML = D.assets.map(a=>{
+    const o = orderFor(a), amt = Math.abs(o.d)*capital;
+    const note = o.heldPct==null ? 'Comparé au signal précédent — renseigne ton poids réel.' : 'Comparé à ton poids réel.';
+    const txt = o.act==='GARDER' ? 'Aucun ordre' : o.act+' '+pct(Math.abs(o.d),1,false)+' du capital ≈ '+usd(amt);
+    return '<div class="card sig '+(a.signal?'on':'off')+'">'+
+      '<div class="sig-head"><div class="sym"><span class="dot" style="background:'+COLORS[a.sym]+'"></span>'+a.name+'</div>'+
+      '<span class="badge '+(a.signal?'bull':'bear')+'">'+(a.signal?'HAUSSIER · INVESTI':'BAISSIER · CASH')+'</span></div>'+
+      '<div class="price num">'+usd(a.price)+'</div>'+
+      '<div class="sub num">MA'+D.config.ma+' '+usd(a.ma)+' · écart <b class="'+cls(a.gap)+'">'+pct(a.gap)+'</b> · signal depuis '+a.streak+' j</div>'+
+      '<div class="grid3">'+
+        '<div><span>Poids cible</span><b class="num">'+pct(a.target,1,false)+'</b></div>'+
+        '<div><span>Volatilité 30 j</span><b class="num">'+pct(a.vol,0,false)+'</b></div>'+
+        '<div><span>Poids actuel (%)</span><input type="number" step="0.1" min="0" max="100" data-sym="'+a.sym+'" placeholder="'+(a.prev_w*100).toFixed(1)+'" value="'+(o.heldPct==null?'':o.heldPct)+'"></div>'+
+      '</div>'+
+      '<div class="order '+o.act+'">'+txt+'<small>'+note+'</small></div></div>';
+  }).join('');
+  document.querySelectorAll('#signals input[data-sym]').forEach(inp=>{
+    inp.addEventListener('change',()=>{
+      const v = inp.value==='' ? null : Math.max(0,Math.min(100,parseFloat(inp.value)));
+      store.set('held_'+inp.dataset.sym, v); renderBanner(); renderSignals(); renderPerf();
+    });
+  });
+}
+
+/* ---------- Tableaux ---------- */
+function renderPerf(){
+  let h = '<tr><th>Période</th><th>Stratégie</th><th>P&amp;L ('+usd(capital)+')</th><th>Buy &amp; Hold</th></tr>';
+  D.periods.forEach(p=>{
+    h += '<tr><td>'+p[0]+'</td><td class="num '+cls(p[1])+'">'+pct(p[1],1)+'</td><td class="num '+cls(p[1])+'">'+(p[1]>=0?'+':'−')+usd(Math.abs(p[1])*capital)+
+         '</td><td class="num '+cls(p[2])+'">'+pct(p[2],1)+'</td></tr>';
+  });
+  $('#perf').innerHTML = h;
+}
+
+function renderMetrics(){
+  const rows = [['Stratégie · complet',D.metrics.strat.full],['Stratégie · train ≤ '+D.config.split.slice(0,4),D.metrics.strat.train],
+                ['Stratégie · test '+(+D.config.split.slice(0,4)+1),D.metrics.strat.test],
+                ['Buy &amp; Hold · complet',D.metrics.bh.full],['Buy &amp; Hold · train',D.metrics.bh.train],['Buy &amp; Hold · test',D.metrics.bh.test]];
+  let h = '<tr><th></th><th>CAGR</th><th>Sharpe</th><th>Max DD</th><th>Calmar</th></tr>';
+  rows.forEach(r=>{ const m=r[1];
+    h += '<tr><td>'+r[0]+'</td><td class="num '+cls(m.cagr)+'">'+pct(m.cagr,1)+'</td><td class="num">'+num(m.sharpe)+'</td><td class="num neg">'+pct(m.mdd,1)+'</td><td class="num">'+num(m.calmar)+'</td></tr>'; });
+  $('#metrics').innerHTML = h;
+}
+
+function heat(v){
+  if(v==null) return '';
+  const a = Math.min(Math.abs(v)/0.2,1)*0.7 + 0.08;
+  return 'background:'+(v>=0 ? 'rgba(34,197,94,'+a+')' : 'rgba(239,68,68,'+a+')');
+}
+function renderMonthly(){
+  const M = D.monthly, years = [...new Set(Object.keys(M).map(k=>k.slice(0,4)))].sort().reverse();
+  const names = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+  let h = '<tr><th>Année</th>'+names.map(x=>'<th>'+x+'</th>').join('')+'<th>Année</th></tr>';
+  years.forEach(y=>{
+    let acc = 1, any = false;
+    const cells = names.map((_,i)=>{ const v = M[y+'-'+String(i+1).padStart(2,'0')];
+      if(v==null) return '<td></td>'; acc *= (1+v); any = true;
+      return '<td class="num" style="'+heat(v)+'">'+(v*100).toFixed(1).replace('.',',')+'</td>'; }).join('');
+    const tot = any ? acc-1 : null;
+    h += '<tr><td>'+y+'</td>'+cells+'<td class="num" style="'+heat(tot)+';font-weight:700">'+(tot==null?'':(tot*100).toFixed(1).replace('.',','))+'</td></tr>';
+  });
+  $('#monthly').innerHTML = h;
+}
+
+function renderTrades(){
+  const nm = Object.fromEntries(D.assets.map(a=>[a.sym,a.name]));
+  let h = '<tr><th>Date de décision</th><th>Actif</th><th>Avant</th><th>Après</th><th>Mouvement</th></tr>';
+  D.trades.forEach(t=>{ const d=t.to-t.frm;
+    h += '<tr><td class="num">'+t.date+'</td><td>'+(nm[t.sym]||t.sym)+'</td><td class="num">'+pct(t.frm,1,false)+'</td><td class="num">'+pct(t.to,1,false)+
+         '</td><td class="'+(d>0?'pos':'neg')+'" style="font-weight:650">'+(d>0?'ACHETER ':'VENDRE ')+pct(Math.abs(d),1,false)+'</td></tr>'; });
+  $('#trades').innerHTML = h;
+}
+
+/* ---------- Graphiques ---------- */
+if(typeof Chart==='undefined'){
+  document.querySelectorAll('.chart').forEach(c=>c.innerHTML='<p class="mut">Chart.js non chargé (connexion internet requise pour les graphiques).</p>');
+} else {
+  Chart.defaults.color = '#8b97ab';
+  Chart.defaults.borderColor = '#1e293b';
+  Chart.defaults.font.family = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+}
+const base = (yExtra={}) => ({
+  responsive:true, maintainAspectRatio:false, animation:false,
+  interaction:{mode:'index',intersect:false},
+  plugins:{legend:{labels:{boxWidth:10,usePointStyle:true}}},
+  scales:{x:{ticks:{maxTicksLimit:8,maxRotation:0},grid:{display:false}}, y:Object.assign({grid:{color:'#1e293b'}},yExtra)},
+  elements:{point:{radius:0},line:{borderWidth:1.8,tension:0}}
+});
+const ddOf = a => { let m=-Infinity; return a.map(v=>{ m=Math.max(m,v); return v/m-1; }); };
+let eqChart, ddChart, range='all', logScale=true;
+
+function drawEquity(){
+  if(typeof Chart==='undefined') return;
+  const E = D.equity, N = E.dates.length;
+  const k = range==='1y'?365 : range==='3y'?1095 : N, i0 = Math.max(0,N-k);
+  const labels = E.dates.slice(i0), s = E.strat.slice(i0), b = E.bh.slice(i0);
+  const rs = s.map(v=>v/s[0]*100), rb = b.map(v=>v/b[0]*100);
+  if(eqChart) eqChart.destroy(); if(ddChart) ddChart.destroy();
+  eqChart = new Chart($('#eqChart'),{type:'line',data:{labels,datasets:[
+    {label:'Stratégie',data:rs,borderColor:'#2dd4bf'},
+    {label:'Buy & Hold',data:rb,borderColor:'#64748b'}]},
+    options:base({type:logScale?'logarithmic':'linear'})});
+  ddChart = new Chart($('#ddChart'),{type:'line',data:{labels,datasets:[
+    {label:'Stratégie',data:ddOf(rs).map(v=>v*100),borderColor:'#2dd4bf',backgroundColor:'rgba(45,212,191,.18)',fill:true},
+    {label:'Buy & Hold',data:ddOf(rb).map(v=>v*100),borderColor:'#64748b'}]},
+    options:base({ticks:{callback:v=>v+' %'}})});
+}
+
+function drawWeights(){
+  if(typeof Chart==='undefined') return;
+  const W = D.weights, syms = D.assets.map(a=>a.sym);
+  const ds = syms.map(s=>({label:D.assets.find(a=>a.sym===s).name,data:W[s].map(v=>v*100),borderColor:COLORS[s],backgroundColor:COLORS[s]+'cc',fill:true,borderWidth:1}));
+  ds.push({label:'Cash',data:W.cash.map(v=>v*100),borderColor:'#475569',backgroundColor:'#33415599',fill:true,borderWidth:1});
+  new Chart($('#wChart'),{type:'line',data:{labels:W.dates,datasets:ds},
+    options:base({stacked:true,min:0,max:100,ticks:{callback:v=>v+' %'}})});
+}
+
+let pChart;
+function drawPrice(sym){
+  if(typeof Chart==='undefined') return;
+  const a = D.assets.find(x=>x.sym===sym);
+  if(pChart) pChart.destroy();
+  pChart = new Chart($('#pChart'),{type:'line',data:{labels:a.chart.dates,datasets:[
+    {label:a.name,data:a.chart.close,borderColor:COLORS[sym]},
+    {label:'MA'+D.config.ma,data:a.chart.ma,borderColor:'#f59e0b',borderDash:[5,4],borderWidth:1.5}]},
+    options:base()});
+  document.querySelectorAll('#priceTabs .btn').forEach(b=>b.classList.toggle('on',b.dataset.sym===sym));
+}
+$('#priceTabs').innerHTML = D.assets.map(a=>'<button class="btn" data-sym="'+a.sym+'">'+a.name+'</button>').join('');
+document.querySelectorAll('#priceTabs .btn').forEach(b=>b.addEventListener('click',()=>drawPrice(b.dataset.sym)));
+document.querySelectorAll('[data-range]').forEach(b=>b.addEventListener('click',()=>{
+  range=b.dataset.range; document.querySelectorAll('[data-range]').forEach(x=>x.classList.toggle('on',x===b)); drawEquity(); }));
+$('#logBtn').addEventListener('click',e=>{ logScale=!logScale; e.target.classList.toggle('on',logScale);
+  e.target.textContent = logScale?'Échelle log':'Échelle linéaire'; drawEquity(); });
+
+/* ---------- Capital ---------- */
+const capIn = $('#capital'); capIn.value = capital;
+capIn.addEventListener('change',()=>{ capital = Math.max(0,parseFloat(capIn.value)||0); store.set('capital',capital); renderSignals(); renderPerf(); });
+
+/* ---------- Pied de page ---------- */
+$('#foot').innerHTML = 'Les performances affichées sont celles d\'un <b>backtest</b> (frais+slippage '+D.config.cost_bps+' bps, cash rémunéré au taux 3 mois US), pas celles de ton compte réel. '+
+  'Les rendements passés ne préjugent pas des rendements futurs. Le « P&amp;L » applique les rendements de la stratégie à ton capital saisi. '+
+  'Poids actuel et capital sont mémorisés uniquement dans ce navigateur. Données : Yahoo Finance, FRED.';
+
+renderBanner(); renderKPIs(); renderSignals(); renderPerf(); renderMetrics(); renderMonthly(); renderTrades();
+drawEquity(); drawWeights(); drawPrice(D.assets[0].sym);
+})();
+</script>
+</body>
+</html>
