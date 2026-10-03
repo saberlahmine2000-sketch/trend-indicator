@@ -1,0 +1,43 @@
+name: Indicateur quotidien
+
+on:
+  schedule:
+    - cron: "25 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: indicator
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Calculer l'indicateur
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python indicator.py
+
+      - name: Enregistrer le résultat
+        run: |
+          git config user.name "indicator-bot"
+          git config user.email "indicator-bot@users.noreply.github.com"
+          git add docs/data.js
+          git diff --cached --quiet || git commit -m "maj indicateur $(date -u +%F)"
+          git push
