@@ -125,6 +125,27 @@ tr:last-child td{border-bottom:0}
   </div>
   <div class="row r2" id="signals"></div>
 
+  <div id="paperWrap" style="display:none">
+    <div class="sec-head">
+      <h2>Paper trading — 8 semaines (test réel sans argent)</h2>
+      <span id="paperPill" class="pill"></span>
+    </div>
+    <div class="kpis" id="paperKpis"></div>
+    <div class="row r3">
+      <div class="card">
+        <h2>Capital simulé depuis le début du test (base 100)</h2>
+        <div class="chart sm"><canvas id="paperChart"></canvas></div>
+      </div>
+      <div class="card" id="paperRules"></div>
+    </div>
+    <div class="row r2">
+      <div class="card" style="grid-column:1/-1">
+        <h2>Journal quotidien du test</h2>
+        <div class="scroll"><table id="paperTable"></table></div>
+      </div>
+    </div>
+  </div>
+
   <div class="row r3">
     <div class="card">
       <h2>Courbe de capital — stratégie vs Buy &amp; Hold (base 100)</h2>
@@ -372,9 +393,64 @@ document.querySelectorAll('[data-range]').forEach(b=>b.addEventListener('click',
 $('#logBtn').addEventListener('click',e=>{ logScale=!logScale; e.target.classList.toggle('on',logScale);
   e.target.textContent = logScale?'Échelle log':'Échelle linéaire'; drawEquity(); });
 
+/* ---------- Paper trading ---------- */
+let paperChart;
+function renderPaper(){
+  const P = D.paper;
+  if(!P){ return; }
+  $('#paperWrap').style.display = '';
+  const fmtD = d => { const x = new Date(d+'T00:00:00Z'); return x.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}); };
+  const pill = $('#paperPill');
+  if(P.status==='pending'){
+    pill.className='pill warn'; pill.textContent='Démarre le '+fmtD(P.start);
+    $('#paperKpis').innerHTML='';
+    $('#paperRules').innerHTML = rulesHtml();
+    $('#paperTable').innerHTML='';
+    const pc=document.querySelector('#paperChart'); if(pc) pc.parentElement.innerHTML='<p class="mut" style="padding:20px">Le test démarre avec la bougie du <b>'+fmtD(P.start)+'</b> (ordre visible le lendemain matin, après 02:30 heure de Paris). Fin prévue : '+fmtD(P.end)+'.</p>';
+    return;
+  }
+  pill.className = 'pill ' + (P.status==='done'?'ok':'warn');
+  pill.textContent = P.status==='done' ? 'Test terminé' : 'En cours · jour '+P.days+' / '+P.days_total;
+  const pnl = capital*P.strat_ret;
+  const items = [
+    ['P&L simulé ('+usd(capital)+')', (pnl>=0?'+':'−')+usd(Math.abs(pnl)), cls(pnl)],
+    ['Stratégie', pct(P.strat_ret,1), cls(P.strat_ret)],
+    ['Buy & Hold', pct(P.bh_ret,1), cls(P.bh_ret)],
+    ['Drawdown max', pct(P.mdd,1), cls(P.mdd)],
+    ['Exposition moyenne', P.avg_exposure==null?'—':pct(P.avg_exposure,0,false), ''],
+    ['Mouvements de poids', String(P.moves), ''],
+  ];
+  $('#paperKpis').innerHTML = items.map(i=>'<div class="kpi"><span>'+i[0]+'</span><b class="num '+i[2]+'">'+i[1]+'</b></div>').join('');
+  $('#paperRules').innerHTML = rulesHtml();
+  if(typeof Chart!=='undefined'){
+    if(paperChart) paperChart.destroy();
+    paperChart = new Chart($('#paperChart'),{type:'line',data:{labels:P.dates,datasets:[
+      {label:'Stratégie',data:P.strat,borderColor:'#2dd4bf',backgroundColor:'rgba(45,212,191,.12)',fill:true},
+      {label:'Buy & Hold',data:P.bh,borderColor:'#64748b'}]},options:base()});
+  }
+  const syms = D.assets.map(a=>a.sym), names = D.assets.map(a=>a.name);
+  let h = '<tr><th>Date</th>'+names.map(x=>'<th>'+x+'</th>').join('')+'<th>Cash</th><th>Jour</th><th>Cumul</th></tr>';
+  if(P.entry){
+    h += '<tr><td class="num">'+P.start+' (entrée)</td>'+syms.map(s=>'<td class="num">'+pct(P.entry[s],1,false)+'</td>').join('')+
+         '<td class="num">'+pct(1-syms.reduce((a,s)=>a+P.entry[s],0),1,false)+'</td><td></td><td></td></tr>';
+  }
+  P.rows.slice().reverse().forEach(r=>{
+    h += '<tr><td class="num">'+r.date+'</td>'+syms.map(s=>'<td class="num">'+pct(r[s],1,false)+'</td>').join('')+
+         '<td class="num">'+pct(r.cash,1,false)+'</td><td class="num '+cls(r.ret)+'">'+pct(r.ret,2)+'</td><td class="num '+cls(r.cum)+'">'+pct(r.cum,1)+'</td></tr>';
+  });
+  $('#paperTable').innerHTML = h;
+}
+function rulesHtml(){
+  return '<h2>Comment lire ce test</h2>'+
+  '<div style="font-size:13px;line-height:1.6">'+
+  '<p style="margin:0 0 8px"><b>Ce que 8 semaines prouvent :</b> que tu sais suivre les ordres, que les signaux arrivent à l\'heure, que le comportement est conforme (sort en baisse, investi en hausse).</p>'+
+  '<p style="margin:0 0 8px"><b>Ce qu\'elles ne prouvent pas :</b> que la stratégie « gagne ». Sur 8 semaines, le résultat est surtout du hasard de marché.</p>'+
+  '<p style="margin:0" class="mut">Critères conseillés : 1) 0 ordre manqué ou en retard ; 2) drawdown du test sous −20 % ; 3) si le marché baisse, le drawdown de la stratégie reste inférieur à celui du Buy &amp; Hold.</p></div>';
+}
+
 /* ---------- Capital ---------- */
 const capIn = $('#capital'); capIn.value = capital;
-capIn.addEventListener('change',()=>{ capital = Math.max(0,parseFloat(capIn.value)||0); store.set('capital',capital); renderSignals(); renderPerf(); });
+capIn.addEventListener('change',()=>{ capital = Math.max(0,parseFloat(capIn.value)||0); store.set('capital',capital); renderSignals(); renderPerf(); renderPaper(); });
 
 /* ---------- Pied de page ---------- */
 $('#foot').innerHTML = 'Les performances affichées sont celles d\'un <b>backtest</b> (frais+slippage '+D.config.cost_bps+' bps, cash rémunéré au taux 3 mois US), pas celles de ton compte réel. '+
@@ -382,7 +458,7 @@ $('#foot').innerHTML = 'Les performances affichées sont celles d\'un <b>backtes
   'Poids actuel et capital sont mémorisés uniquement dans ce navigateur. Données : Yahoo Finance, FRED.';
 
 renderBanner(); renderKPIs(); renderSignals(); renderPerf(); renderMetrics(); renderMonthly(); renderTrades();
-drawEquity(); drawWeights(); drawPrice(D.assets[0].sym);
+drawEquity(); drawWeights(); drawPrice(D.assets[0].sym); renderPaper();
 })();
 </script>
 </body>
